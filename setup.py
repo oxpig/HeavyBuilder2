@@ -23,7 +23,6 @@ setup(
         'scipy>=1.6',
         'einops>=0.3',
         'torch>=1.8',
-        'requests',
         # ANARCI is also a runtime dependency, but it is deliberately absent
         # here.  The `anarci` package on PyPI is not an official release, so
         # ANARCI must come from Bioconda (`bioconda::anarci`).

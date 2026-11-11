@@ -42,7 +42,6 @@ class HeavyBuilder:
         
 
     def save_single_unrefined(self, filename, index=0):
-        # index = self.ranking.index(0)
         atoms = (self.atoms[index] - self.t[index]) @ self.R[index]
         unrefined = to_pdb(self.numbered_sequences, atoms)
         with open(filename, "w+") as file:
@@ -59,8 +58,8 @@ class HeavyBuilder:
 
         for i in range(len(self.atoms)):
 
-            unrefined_filename = os.path.join(dirname,f"rank{self.ranking[i]}_unrefined.pdb")
-            self.save_single_unrefined(unrefined_filename)
+            unrefined_filename = os.path.join(dirname,f"rank{i}_unrefined.pdb")
+            self.save_single_unrefined(unrefined_filename, index=self.ranking[i])
 
         np.save(os.path.join(dirname,"error_estimates"), self.error_estimates.mean(0).cpu().numpy())
         final_filename = os.path.join(dirname, filename)
@@ -73,12 +72,12 @@ class HeavyBuilder:
             filename = "HeavyBuilder2_output.pdb"
 
         for i in range(len(self.atoms)):
-            self.save_single_unrefined(filename)
+            self.save_single_unrefined(filename, index=self.ranking[i])
             success = refine(filename, filename, check_for_strained_bonds=check_for_strained_bonds)
             if success:
                 break
             else:
-                self.save_single_unrefined(filename)
+                self.save_single_unrefined(filename, index=self.ranking[i])
                 success = refine(filename, filename, check_for_strained_bonds=check_for_strained_bonds)
                 if success:
                     break

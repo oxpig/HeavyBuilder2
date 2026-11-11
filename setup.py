@@ -12,6 +12,7 @@ setup(
     long_description=long_description,
     long_description_content_type='text/markdown',
     maintainer_email='joao-diniz@oist.jp',
+    python_requires='>=3.10',
     include_package_data=True,
     packages=find_packages(include=('HeavyBuilder', 'HeavyBuilder.*')),
     entry_points={'console_scripts': [
@@ -22,6 +23,10 @@ setup(
         'scipy>=1.6',
         'einops>=0.3',
         'torch>=1.8',
-        'requests'
+        # ANARCI is also a runtime dependency, but it is deliberately absent
+        # here.  The `anarci` package on PyPI is not an official release, so
+        # ANARCI must come from Bioconda (`bioconda::anarci`).
+        'openmm',
+        'pdbfixer',
     ],
 )

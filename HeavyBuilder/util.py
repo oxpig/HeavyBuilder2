@@ -2,17 +2,6 @@ from HeavyBuilder.constants import res_to_num, atom_types, residue_atoms, restyp
 
 import numpy as np
 import torch
-import requests
-import os
-
-
-def download_file(url, filename):
-    with requests.get(url, stream=True) as r:
-        r.raise_for_status()
-        with open(filename, 'wb+') as f:
-            for chunk in r.iter_content(chunk_size=8192): 
-                f.write(chunk)
-    return filename
 
 
 def get_one_hot(targets, nb_classes=21):
@@ -126,11 +115,3 @@ def add_errors_as_bfactors(filename, errors, header=[]):
 
     with open(filename, "w+") as file:
         file.writelines(new_txt)
-
-
-def are_weights_ready(weights_path):
-    if not os.path.exists(weights_path) or os.path.getsize(weights_path) == 0:
-        return False
-    with open(weights_path, "rb") as f:
-        filestart = str(f.readline())
-    return filestart != "b'EMPTY'"

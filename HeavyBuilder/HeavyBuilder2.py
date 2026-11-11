@@ -4,7 +4,8 @@ import os
 import argparse
 import sys
 from HeavyBuilder.models import StructureModule
-from HeavyBuilder.util import get_encoding, to_pdb, find_alignment_transform, download_file, sequence_dict_from_fasta, add_errors_as_bfactors, are_weights_ready
+from HeavyBuilder.util import get_encoding, to_pdb, find_alignment_transform, sequence_dict_from_fasta, add_errors_as_bfactors
+from HeavyBuilder.weights import fetch as fetch_weights
 from HeavyBuilder.refine import refine
 from HeavyBuilder.sequence_checks import number_sequences
 import time
@@ -16,13 +17,6 @@ embed_dim = {
     "heavy_chain_model_2":256,
     "heavy_chain_model_3":256
     #"heavy_chain_model_4":256
-}
-
-model_urls = {
-    "heavy_chain_model_1": "https://drive.usercontent.google.com/download?id=1DEQC-dCCmtEA0YZ0nh-RoirHKrSO4JFx&export=download&confirm=t&uuid=c10ff3c8-9c62-472d-b3ce-275c7666af35",#"https://drive.google.com/file/d/1DEQC-dCCmtEA0YZ0nh-RoirHKrSO4JFx/view?usp=sharing",
-    "heavy_chain_model_2": "https://drive.usercontent.google.com/download?id=14NRjdAtBJWF3BvZ_L0ItOLN_Os-moYif&export=download&confirm=t&uuid=1161bc9f-1543-44bd-aef9-c5f4c371414d",#"https://drive.google.com/file/d/14NRjdAtBJWF3BvZ_L0ItOLN_Os-moYif/view?usp=sharing",
-    "heavy_chain_model_3": "https://drive.usercontent.google.com/download?id=1-TgBPGoxesh3SZqCEFZk3m5LHCX4BuQn&export=download&confirm=t&uuid=91c94449-ed33-4699-a7bc-4f84fdfb19ed",#"https://drive.google.com/file/d/1-TgBPGoxesh3SZqCEFZk3m5LHCX4BuQn/view?usp=sharing",
-    #"heavy_chain_model_4": "https://drive.google.com/file/d/1IEKXWVug3C_LytVkAdRt43fz5a6xBMrr/view?usp=sharing",
 }
 
 header = "REMARK  NANOBODY STRUCTURE MODELLED USING HEAVYBUILDER2                      \n"
@@ -92,25 +86,17 @@ class HeavyBuilder2:
     def __init__(self, model_ids = [1,2,3], weights_dir=None, numbering_scheme='imgt'): #def __init__(self, model_ids = [1,2,3,4], weights_dir=None, numbering_scheme='imgt'):
         self.device = "cuda" if torch.cuda.is_available() else "cpu"
         self.scheme = numbering_scheme
-        if weights_dir is None:
-            weights_dir = os.path.join(os.path.dirname(os.path.realpath(__file__)), "trained_model")
 
         self.models = {}
         for id in model_ids:
             model_file = f"heavy_chain_model_{id}"
             model = StructureModule(rel_pos_dim=64, embed_dim=embed_dim[model_file]).to(self.device)
-            weights_path = os.path.join(weights_dir, model_file)
+            # Downloads the weights if they are missing or don't match their
+            # SHA-256, so what is loaded is always the published file.
+            weights_path = fetch_weights(model_file, weights_dir)
 
-            try:
-                if not are_weights_ready(weights_path):
-                    print(f"Downloading weights for {model_file}...", flush=True)
-                    download_file(model_urls[model_file], weights_path)
-
-                print("Loading model...")
-                model.load_state_dict(torch.load(weights_path, map_location=torch.device(self.device)))
-            except Exception as e:
-                print(f"ERROR: {model_file} not downloaded or corrupted.", flush=True)
-                raise e
+            print("Loading model...")
+            model.load_state_dict(torch.load(weights_path, map_location=torch.device(self.device)))
 
             model.eval()
             model.to(torch.get_default_dtype())
@@ -172,6 +158,7 @@ def command_line_interface():
     "If this flag is set the output argument will be assumed to be a directory", default=False, action="store_true")
     parser.add_argument("-n", "--numbering_scheme", help="The scheme used to number output heavey chain structures. Available numbering schemes are: imgt, chothia, kabat, aho, wolfguy, martin and raw. Default is imgt.", default='imgt')
     parser.add_argument("-u", "--no_sidechain_bond_check", help="Don't check for strained bonds. This is a bit faster but will rarely generate unphysical side chains", default=False, action="store_true")
+    parser.add_argument("--weights_dir", help="Directory containing the model weights. Missing weights are downloaded into it. Defaults to the trained_model directory inside the installed package.", default=None)
     parser.add_argument("-v", "--verbose", help="Verbose output", default=False, action="store_true")
 
     args = parser.parse_args()
@@ -192,7 +179,7 @@ def command_line_interface():
         print("Running sequence through deep learning model...", flush=True)
 
     try:
-        antibody = HeavyBuilder2(numbering_scheme=args.numbering_scheme).predict(seqs)
+        antibody = HeavyBuilder2(numbering_scheme=args.numbering_scheme, weights_dir=args.weights_dir).predict(seqs)
     except AssertionError as e:
         print(e, flush=True)
         sys.exit(1)
@@ -201,11 +188,11 @@ def command_line_interface():
         print("Heavy chain modelled succesfully, starting refinement.", flush=True)
 
     if args.to_directory:
-        antibody.save_all(args.output,check_for_strained_bonds)
+        antibody.save_all(args.output, check_for_strained_bonds=check_for_strained_bonds)
         if args.verbose:
             print("Refinement finished. Saving all outputs to directory", flush=True)
     else:
-        antibody.save(args.output,check_for_strained_bonds)
+        antibody.save(args.output, check_for_strained_bonds=check_for_strained_bonds)
         if args.verbose:
             outfile = "HeavyBuilder2_output.pdb" if args.output is None else args.output
             print(f"Refinement finished. Saving final structure to {outfile}", flush=True)
